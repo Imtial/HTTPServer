@@ -3,7 +3,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.util.Date;
 
-public class RequestHandler /*implements Runnable*/ {
+public class RequestHandler implements Runnable {
     static final String root = "root";
     static final int BUFFER_SIZE = 4096;
     private Socket socket;
@@ -12,9 +12,9 @@ public class RequestHandler /*implements Runnable*/ {
     private String requestedPath;
     String content;
 
-    public RequestHandler(Socket socket, String request) {
+    public RequestHandler(Socket socket) {
         this.socket = socket;
-        this.request = request;
+        this.request = null;
     }
 
     private String htmlGenerator(File file) {
@@ -40,7 +40,7 @@ public class RequestHandler /*implements Runnable*/ {
     private void sendResponse(String status, String contentType, String content) {
         try {
             PrintWriter pr = new PrintWriter(socket.getOutputStream());
-        
+
             pr.write(status + "\r\n");
             pr.write("Server: Java HTTP Server: 1.0\r\n");
             pr.write("Date: " + new Date() + "\r\n");
@@ -61,28 +61,28 @@ public class RequestHandler /*implements Runnable*/ {
     }
 
     private void sendFile(File file) {
-        
+
         long size = file.length();
-        byte [] buffer = new byte[BUFFER_SIZE];
+        byte[] buffer = new byte[BUFFER_SIZE];
         try {
             PrintWriter pr = new PrintWriter(socket.getOutputStream());
-            
+
             FileInputStream fis = new FileInputStream(file);
             pr.write("HTTP/1.1 200 OK\r\n");
             pr.write("Server: Java HTTP Server: 1.0\r\n");
             pr.write("Date: " + new Date() + "\r\n");
             String mimeType = Files.probeContentType(file.toPath());
-            pr.write("Content-Type: "+ mimeType+ "\r\n");
-            pr.write("Content-Length: "+ size+ "\r\n");
+            pr.write("Content-Type: " + mimeType + "\r\n");
+            pr.write("Content-Length: " + size + "\r\n");
             pr.write("Content-Transfer-Encoding: binary\r\n");
-            pr.write("Content-Disposition: attachment; filename=\""+ file.getName() +"\"\r\n");
+            pr.write("Content-Disposition: attachment; filename=\"" + file.getName() + "\"\r\n");
             pr.write("\r\n");
             pr.flush();
 
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
             int len;
-            while((len = fis.read(buffer)) > 0) {
+            while ((len = fis.read(buffer)) > 0) {
                 dos.write(buffer, 0, len);
             }
             dos.flush();
@@ -94,23 +94,38 @@ public class RequestHandler /*implements Runnable*/ {
         }
     }
 
-    // @Override
-    public void run() { 
-        String requestSplit[] = request.split(" ");
-        requestType = requestSplit[0];
-        requestedPath = requestSplit[1];      
-        if(requestType.equals("GET")) {
-            File requestedFile = new File(root + requestedPath);
-            if(!requestedFile.exists()) {
-                content = null;
-                sendResponse("HTTP/1.1 404 NOT FOUND", null, content);
+    @Override
+    public void run() {
+        
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            request = in.readLine();
+            System.out.println(request);
+            if (request == null) {
+                in.close();
+                return;
             }
-            if(requestedFile.isDirectory()) {
-                content = htmlGenerator(requestedFile);
-                sendResponse("HTTP/1.1 200 OK", "text/html", content);
-            } else {
-                sendFile(requestedFile);
-            }
-        }        
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if(request.length() > 0) {
+            String requestSplit[] = request.split(" ");
+            requestType = requestSplit[0];
+            requestedPath = requestSplit[1];      
+            if(requestType.equals("GET")) {
+                File requestedFile = new File(root + requestedPath);
+                if(!requestedFile.exists()) {
+                    content = null;
+                    sendResponse("HTTP/1.1 404 NOT FOUND", null, content);
+                }
+                if(requestedFile.isDirectory()) {
+                    content = htmlGenerator(requestedFile);
+                    sendResponse("HTTP/1.1 200 OK", "text/html", content);
+                } else {
+                    sendFile(requestedFile);
+                }
+            }  
+        }      
     }
 }

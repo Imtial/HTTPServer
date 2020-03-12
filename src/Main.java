@@ -13,16 +13,9 @@ public class Main {
         System.out.println("Server started.");
         System.out.println("Listening for connections on port " + PORT + "...\n");
 
-        while(!serverSocket.isClosed()) {
+        while(true) {
             Socket socket = serverSocket.accept();
-            new ClientHandler(socket).run();
+            new Thread(new RequestHandler(socket)).start();
         }
-
-        serverSocket.close();
-        
-/* 
-        File file = new File("root/doc1.docx");
-        System.out.println(file.getName());
-        System.out.println(file.length()); */
     }
 }
