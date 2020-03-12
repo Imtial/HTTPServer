@@ -11,10 +11,12 @@ public class RequestHandler implements Runnable {
     private String requestType;
     private String requestedPath;
     String content;
+    private Logger logger;
 
     public RequestHandler(Socket socket) {
         this.socket = socket;
         this.request = null;
+        logger = new Logger();
     }
 
     private String htmlGenerator(File file) {
@@ -40,21 +42,30 @@ public class RequestHandler implements Runnable {
     private void sendResponse(String status, String contentType, String content) {
         try {
             PrintWriter pr = new PrintWriter(socket.getOutputStream());
-
+            String logMessage = "";
             pr.write(status + "\r\n");
+            logMessage += status + "\r\n";
             pr.write("Server: Java HTTP Server: 1.0\r\n");
+            logMessage += "Server: Java HTTP Server: 1.0\r\n";
             pr.write("Date: " + new Date() + "\r\n");
+            logMessage += "Date: " + new Date() + "\r\n";
             if (content == null) {
                 pr.write("Content-Length: 0\r\n");
+                logMessage += "Content-Length: 0\r\n";
             } else {
                 pr.write("Content-Type: " + contentType + "\r\n");
+                logMessage += "Content-Type: " + contentType + "\r\n";
                 pr.write("Content-Length: " + content.length() + "\r\n");
+                logMessage += "Content-Length: " + content.length() + "\r\n";
             }
             pr.write("\r\n");
+            logMessage += "\r\n";
             if (content != null)
                 pr.write(content);
             pr.flush();
             pr.close();
+            logger.log("RESPONSE", logMessage);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -68,17 +79,28 @@ public class RequestHandler implements Runnable {
             PrintWriter pr = new PrintWriter(socket.getOutputStream());
 
             FileInputStream fis = new FileInputStream(file);
+            String logMeassage = "";
+
             pr.write("HTTP/1.1 200 OK\r\n");
+            logMeassage += "HTTP/1.1 200 OK\r\n";
             pr.write("Server: Java HTTP Server: 1.0\r\n");
+            logMeassage += "Server: Java HTTP Server: 1.0\r\n";
             pr.write("Date: " + new Date() + "\r\n");
+            logMeassage += "Date: " + new Date() + "\r\n";
             String mimeType = Files.probeContentType(file.toPath());
             pr.write("Content-Type: " + mimeType + "\r\n");
+            logMeassage += "Content-Type: " + mimeType + "\r\n";
             pr.write("Content-Length: " + size + "\r\n");
+            logMeassage += "Content-Length: " + size + "\r\n";
             pr.write("Content-Transfer-Encoding: binary\r\n");
+            logMeassage += "Content-Transfer-Encoding: binary\r\n";
             pr.write("Content-Disposition: attachment; filename=\"" + file.getName() + "\"\r\n");
+            logMeassage += "Content-Disposition: attachment; filename=\"" + file.getName() + "\"\r\n";
             pr.write("\r\n");
+            logMeassage += "\r\n";
             pr.flush();
-
+            logger.log("RESPONSE", logMeassage);
+            
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
             int len;
@@ -100,11 +122,13 @@ public class RequestHandler implements Runnable {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             request = in.readLine();
-            System.out.println(request);
+
             if (request == null) {
                 in.close();
                 return;
             }
+            logger.log("REQUEST", request);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
