@@ -12,6 +12,7 @@ public class RequestHandler implements Runnable {
     private String requestedPath;
     String content;
     private Logger logger;
+    BufferedReader in;
 
     public RequestHandler(Socket socket) {
         this.socket = socket;
@@ -100,7 +101,7 @@ public class RequestHandler implements Runnable {
             logMeassage += "\r\n";
             pr.flush();
             logger.log("RESPONSE", logMeassage);
-            
+
             DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
             int len;
@@ -118,38 +119,74 @@ public class RequestHandler implements Runnable {
 
     @Override
     public void run() {
-        
         try {
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             request = in.readLine();
 
             if (request == null) {
                 in.close();
                 return;
             }
+            System.out.println(request);
             logger.log("REQUEST", request);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        if(request.length() > 0) {
+        if (request.length() > 0) {
             String requestSplit[] = request.split(" ");
             requestType = requestSplit[0];
-            requestedPath = requestSplit[1];      
-            if(requestType.equals("GET")) {
-                File requestedFile = new File(root + requestedPath);
-                if(!requestedFile.exists()) {
+            requestedPath = requestSplit[1].substring(requestSplit[1].indexOf("/")+1);
+            if (requestType.equals("GET")) {
+                File requestedFile = new File(root + File.separator + requestedPath);
+                if (!requestedFile.exists()) {
                     content = null;
                     sendResponse("HTTP/1.1 404 NOT FOUND", null, content);
                 }
-                if(requestedFile.isDirectory()) {
+                if (requestedFile.isDirectory()) {
                     content = htmlGenerator(requestedFile);
                     sendResponse("HTTP/1.1 200 OK", "text/html", content);
                 } else {
                     sendFile(requestedFile);
                 }
-            }  
+            } else if (requestType.equals("UPLOAD")) {
+                try {
+                    request = in.readLine();
+                    System.out.println(request);
+                    long size = Long.parseLong(request.substring(request.indexOf(" ")+1));
+                    File f = new File(root+File.separator+requestedPath);
+
+                    PrintWriter pw = new PrintWriter(socket.getOutputStream());
+                    pw.write("HTTP/1.1 202 ACCEPTED\r\n");
+                    pw.flush();
+
+                    BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
+
+                    FileOutputStream fos = new FileOutputStream(f);
+                    
+                    byte [] buf = new byte[4096];
+                    int len = 0;
+                    while((len = bis.read(buf)) > 0) {
+                        fos.write(buf, 0, len);
+                        // System.out.println(len);
+                    }
+                    fos.close();
+                    socket.shutdownInput();
+                    if(size == f.length())
+                        pw.write("HTTP/1.1 201 CREATED\r\n");
+                    else 
+                        pw.write("HTTP/1.1 409 Conflict\r\n");
+                    pw.flush();
+
+                    socket.close();
+
+                    System.out.println("FINISHED");
+
+                } catch (IOException | NumberFormatException e) {
+                    e.printStackTrace();
+                }
+            } 
         }      
     }
 }
