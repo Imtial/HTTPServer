@@ -10,62 +10,44 @@ public class ClientThread implements Runnable{
         this.filePath = filePath;
     }
 
-    String readLine(BufferedInputStream in) {
-        try{
-            StringBuilder sb = new StringBuilder();
-            boolean eol = false;
-            int i;
-            while((i = in.read()) != -1) {
-                char c = (char) i;
-                if(c == '\r'){
-                    eol = true;
-                    continue;
-                }
-                if(eol) {
-                    if(c == '\n') break;
-                    else eol = false;
-                }
-                sb.append(c);
-            }
-            return sb.toString();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     @Override
     public void run() {
         try {
             File file = new File(filePath);
             if (!file.isFile())
             {
+                System.out.println(filePath+" is not a file.");
                 return;
             }
-            OutputStream os = socket.getOutputStream();
+            PrintWriter pw = new PrintWriter(socket.getOutputStream());
+            pw.write("UPLOAD "+file.getName()+"\r\n");
+            pw.write("Content-Length: "+ file.length()+ "\r\n");
+            pw.flush();
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            String response = br.readLine();
+            System.out.println(response);
 
             BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
-            BufferedInputStream bis = new BufferedInputStream(socket.getInputStream());
-            bos.write(("UPLOAD "+file.getName()+"\r\n").getBytes());
-            bos.write(("Content-Length: "+ file.length()+ "\r\n").getBytes());
-            bos.flush();
 
             FileInputStream fis = new FileInputStream(file);
             byte[] buf = new byte[4096];
 
-            int content = 0;
+            int len = 0;
             
-            while ((content = fis.read(buf)) > 0) {
-                bos.write(buf, 0, content);
-                System.out.println(content);
+            while ((len = fis.read(buf)) > 0) {
+                bos.write(buf, 0, len);
+                // System.out.println(len);
             }
             bos.flush();
             fis.close();
+            socket.shutdownOutput();
 
-            String response = readLine(bis);
+            response = br.readLine();
             System.out.println(response);
-            
-            bos.close();
+
+            socket.close();
             System.out.println("FINISHED");
             
         } catch (IOException e) {

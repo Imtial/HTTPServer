@@ -13,9 +13,11 @@ public class Main {
         System.out.println("Server started.");
         System.out.println("Listening for connections on port " + PORT + "...\n");
 
-        while(true) {
+        while(!serverSocket.isClosed()) {
             Socket socket = serverSocket.accept();
             new Thread(new RequestHandler(socket)).start();
         }
+
+        serverSocket.close();
     }
 }
